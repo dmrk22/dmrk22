@@ -236,30 +236,44 @@ function target(cx, cy, r, color, width = 1.2) {
 }
 
 // ─── Themes ──────────────────────────────────────────────────────────────────
-// Light is paper: inks multiply, and oxblood × steel × moss overprint to a near-neutral black
-// (≈ #0c0908). Dark is a screen: light adds, and brick + steel + sage screen to a soft white
-// (≈ #f2eeee). check() holds both composites to neutral.
+// Light is paper (inks multiply); dark is a screen (light adds). The three colour plates are
+// crimson, cobalt and emerald at one perceptual lightness per theme (OKLCH L 0.56 on paper,
+// 0.70 on screen), each at the most chroma sRGB allows: bright, and balanced so none shouts.
+// Intelligence is the key plate: it prints last, in the page's own ink, and carries the name.
 
 const THEME = {
   light: {
-    ink: '#1f2328', muted: '#59636e', faint: '#d1d9e0', blend: 'multiply', highlight: 0.4,
-    plates: { brain: '#9e3a3a', silicon: '#33557d', genome: '#5f7a48' },
-    margin: '#c2477f', grid: '#4f8fb8',
+    ink: '#1f2328', muted: '#59636e', faint: '#d1d9e0', blend: 'multiply', highlight: 0.35, page: '#ffffff',
+    plates: { brain: '#d4212d', silicon: '#3167ed', genome: '#048b56' },
+    margin: '#d6336c', grid: '#3b8fd9',
   },
   dark: {
-    ink: '#f0f6fc', muted: '#9198a1', faint: '#3d444d', blend: 'screen', highlight: 0.45,
-    plates: { brain: '#c96a60', silicon: '#6f94c4', genome: '#8fb88a' },
-    margin: '#c96a9a', grid: '#6f94c4',
+    ink: '#f0f6fc', muted: '#9198a1', faint: '#3d444d', blend: 'screen', highlight: 0.45, page: '#0d1117',
+    plates: { brain: '#ff645f', silicon: '#6c9aff', genome: '#0bbc76' },
+    margin: '#ff5fa2', grid: '#6c9aff',
   },
 };
 
-// What the three plates print where they all overlap: multiply on paper, screen on a screen.
-function composite(theme) {
-  const k = THEME[theme], ch = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
-  const plates = SUBSTRATES.map((p) => ch(k.plates[p]));
-  return [0, 1, 2].map((i) => Math.round(255 * (k.blend === 'multiply'
-    ? plates.reduce((a, p) => a * p[i], 1)
-    : 1 - plates.reduce((a, p) => a * (1 - p[i]), 1))));
+// OKLCH chroma of an sRGB hex colour: how vivid it is, independent of how light.
+function chroma(hex) {
+  const lin = [1, 3, 5].map((i) => { const c = parseInt(hex.slice(i, i + 2), 16) / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
+  const [l, m, s] = [
+    0.4122214708 * lin[0] + 0.5363325363 * lin[1] + 0.0514459929 * lin[2],
+    0.2119034982 * lin[0] + 0.6806995451 * lin[1] + 0.1073969566 * lin[2],
+    0.0883024619 * lin[0] + 0.2817188376 * lin[1] + 0.6299787005 * lin[2],
+  ].map(Math.cbrt);
+  const a = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s, b = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s;
+  return Math.hypot(a, b);
+}
+
+// WCAG contrast ratio between two hex colours.
+function contrast(x, y) {
+  const lum = (hex) => [1, 3, 5].reduce((sum, i, n) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return sum + [0.2126, 0.7152, 0.0722][n] * (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  }, 0);
+  const [hi, lo] = [lum(x), lum(y)].sort((p, q) => q - p);
+  return (hi + 0.05) / (lo + 0.05);
 }
 const SUBSTRATES = ['brain', 'silicon', 'genome'];
 
@@ -291,12 +305,17 @@ function hero(theme) {
   const targets = [[600, 16], [600, H - 16], [16, cy], [W - 16, cy]];
 
   // One ink plate: everything that prints in that ink, moving together like a real sheet.
-  // The intelligence chip is on all three plates: it only reads as one colour in register.
+  // The intelligence chip is on all three plates, so it shows their overlap while they move.
   const plate = (p) => `<g class="plate ${p}" fill="${k.plates[p]}">`
     + `<use href="#name" xlink:href="#name" x="${X}" y="${base}"/>`
     + `<rect x="${chipX(SUBSTRATES.indexOf(p))}" y="${chip.y}" width="${chip.w}" height="${chip.h}"/>`
     + `<rect x="${chipX(3)}" y="${chip.y}" width="${chip.w}" height="${chip.h}"/>`
     + targets.map(([x, y]) => target(x, y, 8, k.plates[p])).join('') + '</g>';
+  // The key plate prints last, in the page's own ink, once the colour plates agree: the name,
+  // the intelligence chip and the targets. It is what the eye reads at rest.
+  const key = `<g class="key" fill="${k.ink}"><use href="#name" xlink:href="#name" x="${X}" y="${base}"/>`
+    + `<rect x="${chipX(3)}" y="${chip.y}" width="${chip.w}" height="${chip.h}"/>`
+    + targets.map(([x, y]) => target(x, y, 8, k.ink)).join('') + '</g>';
 
   // Non-printing guides, the way a layout looks before you hide them.
   let grid = '';
@@ -316,13 +335,16 @@ function hero(theme) {
     .label{animation:label .5s ease-out both}
     .l0{animation-delay:1.45s}.l1{animation-delay:1.6s}.l2{animation-delay:1.75s}.l3{animation-delay:2s}
     @keyframes label{from{opacity:0}}
+    .key{animation:key .55s ease-out 1.8s both}
+    @keyframes key{from{opacity:0}}
     .guides{animation:guides .7s ease-in 1.9s both}
     @keyframes guides{to{opacity:0}}
-    @media (prefers-reduced-motion:reduce){.plate,.label{animation:none}.guides{animation:none;opacity:0}}`;
+    @media (prefers-reduced-motion:reduce){.plate,.label,.key{animation:none}.guides{animation:none;opacity:0}}`;
 
   const body = `<defs><path id="name" d="${name.d}"/></defs>`
     + guides
     + `<g style="isolation:isolate">${SUBSTRATES.map(plate).join('')}</g>`
+    + key
     + `<g fill="${k.ink}"><path transform="translate(${X} ${line1})" d="${lines[0].d}"/>`
     + `<path transform="translate(${X} ${line2})" d="${lines[1].d}"/></g>`
     + chips.map((c, i) => `<path class="label l${i}" fill="${k.muted}" transform="translate(${chipX(i)} ${labels})" d="${type(c, { size: 17, wght: 500, opsz: 12 }).d}"/>`).join('')
@@ -354,8 +376,8 @@ function matter(theme) {
   });
   cols.forEach(([name, reading], i) => {
     const x = r1(X + i * (cw + gap));
-    const inks = name === 'intelligence' ? SUBSTRATES : [name];
-    body += `<g style="isolation:isolate">${inks.map((p) => `<rect x="${x}" y="${top}" width="${cw}" height="8" fill="${k.plates[p]}" style="mix-blend-mode:${k.blend}"/>`).join('')}</g>`
+    // Intelligence is the key plate here too: the page's own ink.
+    body += `<rect x="${x}" y="${top}" width="${cw}" height="8" fill="${name === 'intelligence' ? k.ink : k.plates[name]}"/>`
       + `<path fill="${k.ink}" transform="translate(${x} ${top + 50})" d="${type(name, { size: 38, wght: 700, opsz: 36 }).d}"/>`
       + `<path fill="${k.muted}" transform="translate(${x} ${top + 86})" d="${type(reading, { size: 24, wght: 400, opsz: 24 }).d}"/>`
       + relax(x, top + 112, cw, 96, k, name === 'intelligence' ? null : k.plates[name]);
@@ -652,62 +674,81 @@ const REBEKA = {
   },
 };
 
-// The appointment booking portal: a month to pick from, a clock, and the pass it issues.
+// The appointment booking portal, left to right as a visitor meets it: pick a date, pick a time,
+// get the pass, and watch the confirmation pixels fly off it to finish the site's heart.
 const BOOKING = {
   title: 'Appointment booking portal',
   bg: '#fff6fa',
-  inks: ['#3a2a4d', '#5b9bff', '#cfe6ff', '#ff5fa2', '#7b6a8e'],
+  inks: ['#ff5fa2', '#5b9bff', '#3a2a4d', '#cfe6ff', '#e23e86'],
   draw(W, H) {
-    const c = { milk: '#ffffff', rose: '#e23e86', sky: '#cfe6ff', corn: '#5b9bff', ink: '#3a2a4d', soft: '#7b6a8e', past: '#f3eef5', line: '#e6dcea' };
+    const c = { milk: '#ffffff', bubble: '#ff5fa2', rose: '#e23e86', blush: '#ffd1e3', sky: '#cfe6ff', corn: '#5b9bff', ink: '#3a2a4d', soft: '#7b6a8e', past: '#f3eef5', line: '#e6dcea' };
     const box = (x, y, w, h, r) => `M${x + r} ${y}H${x + w - r}Q${x + w} ${y} ${x + w} ${y + r}V${y + h - r}Q${x + w} ${y + h} ${x + w - r} ${y + h}`
       + `H${x + r}Q${x} ${y + h} ${x} ${y + h - r}V${y + r}Q${x} ${y} ${x + r} ${y}Z`;
-    // Everything interactive on the site sits on a hard 8-bit shadow.
+    // Everything on the site sits on a hard 8-bit shadow.
     const card = (d) => `<path d="${d}" transform="translate(5 5)" fill="${c.ink}"/><path d="${d}" fill="${c.milk}" stroke="${c.ink}" stroke-width="2"/>`;
 
     // The calendar: a month starting on a Wednesday, past days greyed, one date picked.
-    const cal = { x: 36, y: 24, w: 300, h: 178 };
+    const cal = { x: 28, y: 32, w: 216, h: 164 };
     let s = card(box(cal.x, cal.y, cal.w, cal.h, 12))
-      + `<path d="M${cal.x} ${cal.y + 34}H${cal.x + cal.w}" stroke="${c.ink}" stroke-width="2"/>`
-      + `<rect x="${cal.x + 16}" y="${cal.y + 12}" width="96" height="10" rx="5" fill="${c.ink}"/>`
-      + `<path d="M${cal.x + cal.w - 44} ${cal.y + 17}l7-6v12zM${cal.x + cal.w - 18} ${cal.y + 17}l-7-6v12z" fill="${c.ink}"/>`;
-    const cw = 34, ch = 20, gap = 6;
+      + `<path d="M${cal.x} ${cal.y + 30}H${cal.x + cal.w}" stroke="${c.ink}" stroke-width="2"/>`
+      + `<rect x="${cal.x + 14}" y="${cal.y + 11}" width="78" height="9" rx="4.5" fill="${c.ink}"/>`
+      + `<path d="M${cal.x + cal.w - 38} ${cal.y + 15}l6-5v10zM${cal.x + cal.w - 16} ${cal.y + 15}l-6-5v10z" fill="${c.ink}"/>`;
     for (let r = 0; r < 5; r++) for (let d = 0; d < 7; d++) {
       const day = r * 7 + d - 2;
       if (day < 0 || day > 29) continue;
       const picked = day === 17, past = day < 9;
-      s += `<rect x="${cal.x + 13 + d * (cw + gap)}" y="${cal.y + 46 + r * (ch + 5)}" width="${cw}" height="${ch}" rx="5" `
-        + `fill="${picked ? c.corn : past ? c.past : c.milk}" stroke="${picked ? c.ink : c.line}" stroke-width="${picked ? 2 : 1}"/>`;
+      s += `<rect x="${cal.x + 11 + d * 29}" y="${cal.y + 42 + r * 21}" width="24" height="17" rx="4" `
+        + `fill="${picked ? c.bubble : past ? c.past : c.milk}" stroke="${picked ? c.ink : c.line}" stroke-width="${picked ? 2 : 1}"/>`;
     }
 
-    // The clock: its hands sweep the shortest way to the chosen time (here, half past four).
-    const k = { x: 472, y: 114, r: 78 };
+    // The clock: hands sweep the shortest way to the chosen time (here, half past four).
+    const k = { x: 318, y: 114, r: 60 };
     s += `<circle cx="${k.x + 5}" cy="${k.y + 5}" r="${k.r}" fill="${c.ink}"/><circle cx="${k.x}" cy="${k.y}" r="${k.r}" fill="${c.milk}" stroke="${c.ink}" stroke-width="2"/>`;
     for (let i = 0; i < 12; i++) {
-      const a = (i * Math.PI) / 6, major = i % 3 === 0, r0 = k.r - (major ? 16 : 9), r1_ = k.r - 6;
-      s += `<path d="M${r1(k.x + r0 * Math.sin(a))} ${r1(k.y - r0 * Math.cos(a))}L${r1(k.x + r1_ * Math.sin(a))} ${r1(k.y - r1_ * Math.cos(a))}" stroke="${c.ink}" stroke-width="${major ? 3 : 1.5}" stroke-linecap="round"/>`;
+      const a = (i * Math.PI) / 6, major = i % 3 === 0, r0 = k.r - (major ? 13 : 7), rOut = k.r - 5;
+      s += `<path d="M${r1(k.x + r0 * Math.sin(a))} ${r1(k.y - r0 * Math.cos(a))}L${r1(k.x + rOut * Math.sin(a))} ${r1(k.y - rOut * Math.cos(a))}" stroke="${c.ink}" stroke-width="${major ? 3 : 1.5}" stroke-linecap="round"/>`;
     }
     const hand = (turn, len, width, color) => `<path d="M${k.x} ${k.y}L${r1(k.x + len * Math.sin(turn * 2 * Math.PI))} ${r1(k.y - len * Math.cos(turn * 2 * Math.PI))}" stroke="${color}" stroke-width="${width}" stroke-linecap="round"/>`;
-    s += hand(4.5 / 12, 40, 5, c.ink) + hand(0.5, 60, 3, c.corn) + `<circle cx="${k.x}" cy="${k.y}" r="5.5" fill="${c.rose}"/>`;
+    s += hand(4.5 / 12, 31, 5, c.ink) + hand(0.5, 47, 3, c.corn) + `<circle cx="${k.x}" cy="${k.y}" r="5" fill="${c.bubble}"/>`;
 
-    // The pass: rows of details, the photo that confirms the booking, a stub with a barcode.
-    const t = { x0: 604, y0: 32, x1: 1104, y1: 196, r: 12, nx: 944 };
+    // The pass: details, the photo that confirms the booking, a stub with a barcode.
+    const t = { x0: 408, y0: 40, x1: 782, y1: 190, r: 12, nx: 690 };
     const pass = `M${t.x0 + t.r} ${t.y0}H${t.nx - 10}A10 10 0 0 0 ${t.nx + 10} ${t.y0}H${t.x1 - t.r}Q${t.x1} ${t.y0} ${t.x1} ${t.y0 + t.r}`
       + `V${t.y1 - t.r}Q${t.x1} ${t.y1} ${t.x1 - t.r} ${t.y1}H${t.nx + 10}A10 10 0 0 0 ${t.nx - 10} ${t.y1}H${t.x0 + t.r}`
       + `Q${t.x0} ${t.y1} ${t.x0} ${t.y1 - t.r}V${t.y0 + t.r}Q${t.x0} ${t.y0} ${t.x0 + t.r} ${t.y0}Z`;
     s += card(pass) + `<path d="M${t.nx} ${t.y0 + 14}V${t.y1 - 14}" stroke="${c.ink}" stroke-width="1.6" stroke-dasharray="3 5"/>`;
-    [[150, c.ink], [118, c.corn], [170, c.ink]].forEach(([w, col], i) => {
-      const y = t.y0 + 26 + i * 44;
-      s += `<rect x="${t.x0 + 24}" y="${y}" width="54" height="7" rx="3.5" fill="${c.soft}" opacity=".45"/>`
-        + `<rect x="${t.x0 + 24}" y="${y + 14}" width="${w}" height="11" rx="5.5" fill="${col}"/>`;
+    [[118, c.ink], [92, c.corn], [130, c.bubble]].forEach(([w, col], i) => {
+      const y = t.y0 + 22 + i * 38;
+      s += `<rect x="${t.x0 + 22}" y="${y}" width="46" height="7" rx="3.5" fill="${c.soft}" opacity=".45"/>`
+        + `<rect x="${t.x0 + 22}" y="${y + 13}" width="${w}" height="10" rx="5" fill="${col}"/>`;
     });
-    s += `<g transform="rotate(-4 ${t.x0 + 274} ${t.y0 + 80})"><rect x="${t.x0 + 230}" y="${t.y0 + 22}" width="88" height="104" fill="${c.milk}" stroke="${c.ink}" stroke-width="1.6"/>`
-      + `<rect x="${t.x0 + 238}" y="${t.y0 + 30}" width="72" height="68" fill="${c.sky}"/><circle cx="${t.x0 + 274}" cy="${t.y0 + 56}" r="11" fill="${c.milk}"/>`
-      + `<path d="M${t.x0 + 252} ${t.y0 + 98}c0-16 10-24 22-24s22 8 22 24" fill="${c.milk}"/></g>`
-      + `<rect x="${t.x0 + 232}" y="${t.y0 + 104}" width="62" height="22" rx="4" fill="none" stroke="${c.rose}" stroke-width="2" transform="rotate(-12 ${t.x0 + 263} ${t.y0 + 115})"/>`;
+    s += `<g transform="rotate(-4 ${t.x0 + 212} ${t.y0 + 63})"><rect x="${t.x0 + 176}" y="${t.y0 + 20}" width="72" height="86" fill="${c.milk}" stroke="${c.ink}" stroke-width="1.6"/>`
+      + `<rect x="${t.x0 + 182}" y="${t.y0 + 26}" width="60" height="56" fill="${c.sky}"/><circle cx="${t.x0 + 212}" cy="${t.y0 + 47}" r="9" fill="${c.milk}"/>`
+      + `<path d="M${t.x0 + 194} ${t.y0 + 82}c0-13 8-20 18-20s18 7 18 20" fill="${c.milk}"/></g>`
+      + `<rect x="${t.x0 + 178}" y="${t.y0 + 96}" width="52" height="19" rx="4" fill="none" stroke="${c.rose}" stroke-width="2" transform="rotate(-12 ${t.x0 + 204} ${t.y0 + 105})"/>`;
     const rand = rng(5);
-    let bars = '', bx = t.nx + 24;
-    while (bx < t.x1 - 26) { const w = [1.5, 2.5, 4][Math.floor(rand() * 3)]; bars += `M${r1(bx)} ${t.y0 + 30}h${w}v${t.y1 - t.y0 - 60}h-${w}z`; bx += w + 2 + rand() * 2.5; }
-    return s + `<path d="${bars}" fill="${c.ink}"/>`;
+    let bars = '', bx = t.nx + 18;
+    while (bx < t.x1 - 20) { const w = [1.5, 2.5, 4][Math.floor(rand() * 3)]; bars += `M${r1(bx)} ${t.y0 + 26}h${w}v${t.y1 - t.y0 - 52}h-${w}z`; bx += w + 2 + rand() * 2.5; }
+    s += `<path d="${bars}" fill="${c.ink}"/>`;
+
+    // The confirmation: the heart from the site's favicon, cell by cell, some cells still flying in.
+    const runs = 'M2 0h2v1H2zM7 0h2v1H7zM1 1h2v1H1zM6 1h4v1H6zM0 2h3v1H0zM4 2h7v1H4zM0 3h11v2H0zM1 5h9v1H1zM2 6h7v1H2zM3 7h5v1H3zM4 8h3v1H4zM5 9h1v1H5z';
+    const cellsOf = (d) => [...d.matchAll(/M(\d+) (\d+)h(\d+)v(\d+)/g)].flatMap(([, x, y, w, h]) =>
+      Array.from({ length: +w * +h }, (_, i) => [+x + (i % +w), +y + Math.floor(i / +w)]));
+    const cells = [...cellsOf(runs).map((p) => [...p, c.bubble]), ...cellsOf('M3 1h2v1H3zM3 2h1v1H3z').map((p) => [...p, c.milk])];
+    const cs = 12, hx = 958, hy = 50;
+    const flying = new Set(cells.map((_, i) => i).filter((i) => cells[i][0] <= 3 && rand() < 0.45));
+    cells.forEach(([x, y], i) => { if (!flying.has(i)) s += `<rect x="${hx + x * cs + 4}" y="${hy + y * cs + 4}" width="${cs}" height="${cs}" fill="${c.ink}"/>`; });
+    cells.forEach(([x, y, col], i) => {
+      const home = [hx + x * cs, hy + y * cs];
+      if (!flying.has(i)) { s += `<rect x="${home[0]}" y="${home[1]}" width="${cs}" height="${cs}" fill="${col}"/>`; return; }
+      // Each flying cell starts in the gap between the pass and the heart, never on the pass.
+      const from = [r1(t.x1 + 18 + rand() * (home[0] - 60 - t.x1 - 18)), r1(home[1] + (rand() - 0.5) * 110)];
+      s += `<path d="M${from[0] + cs / 2} ${from[1] + cs / 2}Q${r1((from[0] + home[0]) / 2)} ${r1(Math.min(from[1], home[1]) - 30)} ${home[0] + cs / 2} ${home[1] + cs / 2}" fill="none" stroke="${c.corn}" stroke-width="1.2" stroke-dasharray="2 5" opacity=".7"/>`
+        + `<rect x="${from[0]}" y="${from[1]}" width="${cs}" height="${cs}" fill="${col === c.milk ? c.blush : col}" transform="rotate(${r1((rand() - 0.5) * 40)} ${from[0] + cs / 2} ${from[1] + cs / 2})"/>`;
+    });
+    const star = (x, y, r, col) => `<path d="M${x} ${y - r}Q${x} ${y} ${x + r} ${y}Q${x} ${y} ${x} ${y + r}Q${x} ${y} ${x - r} ${y}Q${x} ${y} ${x} ${y - r}Z" fill="${col}"/>`;
+    return s + star(1108, 42, 8, c.corn) + star(1112, 188, 7, c.bubble) + star(918, 34, 6, c.blush) + star(944, 200, 5, c.corn);
   },
 };
 
@@ -733,11 +774,15 @@ function check(files) {
   for (const [paise, want] of cases) if (inr(paise) !== want) problems.push(`inr(${paise}) = ${inr(paise)}, want ${want}`);
   if (short('M1.25 -0.04L2e-7 3.96') !== 'M1.3 0L0 4') problems.push(`short() = ${short('M1.25 -0.04L2e-7 3.96')}`);
   if (tint('#000000', 0.3) !== '#b3b3b3') problems.push(`tint = ${tint('#000000', 0.3)}`);
-  // The name is printed only by the three plates, so their overprint must read as black on paper
-  // and white on screen: dark or light enough, and no channel off by more than a small tint.
-  const [lr, lg, lb] = composite('light'), [dr, dg, db] = composite('dark');
-  if (Math.max(lr, lg, lb) > 24 || Math.max(lr, lg, lb) - Math.min(lr, lg, lb) > 8) problems.push(`light composite ${[lr, lg, lb]} is not a near-neutral black`);
-  if (Math.min(dr, dg, db) < 228 || Math.max(dr, dg, db) - Math.min(dr, dg, db) > 8) problems.push(`dark composite ${[dr, dg, db]} is not a near-neutral white`);
+  // The plates must stay bright (the muted set this replaced had steel, moss and sage near 0.08)
+  // and readable on their page; and the name must come from the key plate, in the page's ink.
+  for (const theme of ['light', 'dark']) {
+    for (const [name, hex] of Object.entries(THEME[theme].plates)) {
+      if (chroma(hex) < 0.12) problems.push(`${theme} ${name} ${hex} is too dull (chroma ${chroma(hex).toFixed(3)})`);
+      if (contrast(hex, THEME[theme].page) < 4) problems.push(`${theme} ${name} ${hex} is too faint on its page (${contrast(hex, THEME[theme].page).toFixed(2)}:1)`);
+    }
+    if (!files[`hero-${theme}`].includes(`<g class="key" fill="${THEME[theme].ink}">`)) problems.push(`hero-${theme}: no key plate in the page ink`);
+  }
   // The rebuilt TrueType must draw exactly what the WOFF2 draws at the default instance,
   // for a simple glyph, a composite (é) and the apostrophe.
   for (const ch of 'dké’2') {
