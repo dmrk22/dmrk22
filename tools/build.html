@@ -236,21 +236,31 @@ function target(cx, cy, r, color, width = 1.2) {
 }
 
 // ─── Themes ──────────────────────────────────────────────────────────────────
-// Light is paper: subtractive process inks, and brain + silicon + genome overprint to black.
-// Dark is a screen: additive light, and the same three add up to white.
+// Light is paper: inks multiply, and oxblood × steel × moss overprint to a near-neutral black
+// (≈ #0c0908). Dark is a screen: light adds, and brick + steel + sage screen to a soft white
+// (≈ #f2eeee). check() holds both composites to neutral.
 
 const THEME = {
   light: {
-    ink: '#1f2328', muted: '#59636e', faint: '#d1d9e0', blend: 'multiply', highlight: 0.55,
-    plates: { brain: '#ec008c', silicon: '#00aeef', genome: '#fff200' },
-    margin: '#e0147d', grid: '#00a3e0',
+    ink: '#1f2328', muted: '#59636e', faint: '#d1d9e0', blend: 'multiply', highlight: 0.4,
+    plates: { brain: '#9e3a3a', silicon: '#33557d', genome: '#5f7a48' },
+    margin: '#c2477f', grid: '#4f8fb8',
   },
   dark: {
-    ink: '#f0f6fc', muted: '#9198a1', faint: '#3d444d', blend: 'screen', highlight: 0.5,
-    plates: { brain: '#ff3355', silicon: '#3377ff', genome: '#33ff99' },
-    margin: '#ff4fb8', grid: '#39c5f3',
+    ink: '#f0f6fc', muted: '#9198a1', faint: '#3d444d', blend: 'screen', highlight: 0.45,
+    plates: { brain: '#c96a60', silicon: '#6f94c4', genome: '#8fb88a' },
+    margin: '#c96a9a', grid: '#6f94c4',
   },
 };
+
+// What the three plates print where they all overlap: multiply on paper, screen on a screen.
+function composite(theme) {
+  const k = THEME[theme], ch = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const plates = SUBSTRATES.map((p) => ch(k.plates[p]));
+  return [0, 1, 2].map((i) => Math.round(255 * (k.blend === 'multiply'
+    ? plates.reduce((a, p) => a * p[i], 1)
+    : 1 - plates.reduce((a, p) => a * (1 - p[i]), 1))));
+}
 const SUBSTRATES = ['brain', 'silicon', 'genome'];
 
 // ─── Hero: three plates slide into register ──────────────────────────────────
@@ -642,51 +652,62 @@ const REBEKA = {
   },
 };
 
-// The gift: pixels fly home to make a heart.
-const GIFT = {
-  title: 'A six-hour gift',
+// The appointment booking portal: a month to pick from, a clock, and the pass it issues.
+const BOOKING = {
+  title: 'Appointment booking portal',
   bg: '#fff6fa',
-  inks: ['#ff5fa2', '#e23e86', '#ffd1e3', '#5b9bff', '#3a2a4d'],
+  inks: ['#3a2a4d', '#5b9bff', '#cfe6ff', '#ff5fa2', '#7b6a8e'],
   draw(W, H) {
-    const c = { milk: '#ffffff', blush: '#ffd1e3', bubble: '#ff5fa2', rose: '#e23e86', sky: '#cfe6ff', corn: '#5b9bff', ink: '#3a2a4d' };
-    // The heart from the site's favicon, cell by cell.
-    const runs = 'M2 0h2v1H2zM7 0h2v1H7zM1 1h2v1H1zM6 1h4v1H6zM0 2h3v1H0zM4 2h7v1H4zM0 3h11v2H0zM1 5h9v1H1zM2 6h7v1H2zM3 7h5v1H3zM4 8h3v1H4zM5 9h1v1H5z';
-    const cellsOf = (d) => [...d.matchAll(/M(\d+) (\d+)h(\d+)v(\d+)/g)].flatMap(([, x, y, w, h]) =>
-      Array.from({ length: +w * +h }, (_, k) => [+x + (k % +w), +y + Math.floor(k / +w)]));
-    const shine = cellsOf('M3 1h2v1H3zM3 2h1v1H3z');
-    const cells = [...cellsOf(runs).map((p) => [...p, c.bubble]), ...shine.map((p) => [...p, c.milk])];
-    const cs = 13, hx = 884, hy = 44, rand = rng(5);
-    const flying = new Set(cells.map((_, i) => i).filter((i) => cells[i][0] <= 3 && rand() < 0.42));
-    let s = '';
-    cells.forEach(([x, y], i) => { if (!flying.has(i)) s += `<rect x="${hx + x * cs + 5}" y="${hy + y * cs + 5}" width="${cs}" height="${cs}" fill="${c.ink}"/>`; });
-    cells.forEach(([x, y, col], i) => {
-      const home = [hx + x * cs, hy + y * cs];
-      if (!flying.has(i)) { s += `<rect x="${home[0]}" y="${home[1]}" width="${cs}" height="${cs}" fill="${col}"/>`; return; }
-      const from = [r1(home[0] - 90 - rand() * 300), r1(home[1] + (rand() - 0.5) * 120)];
-      s += `<path d="M${from[0] + cs / 2} ${from[1] + cs / 2}Q${r1((from[0] + home[0]) / 2)} ${r1(Math.min(from[1], home[1]) - 40)} ${home[0] + cs / 2} ${home[1] + cs / 2}" fill="none" stroke="${c.corn}" stroke-width="1.2" stroke-dasharray="2 5" opacity=".7"/>`
-        + `<rect x="${from[0]}" y="${from[1]}" width="${cs}" height="${cs}" fill="${col === c.milk ? c.blush : col}" transform="rotate(${r1((rand() - 0.5) * 40)} ${from[0] + cs / 2} ${from[1] + cs / 2})"/>`;
-    });
-    // The ticket she gets: boarding-pass shape with notches, a photo as the fee, a barcode.
-    const t = { x0: 40, y0: 38, x1: 470, y1: 190, r: 12, nx: 372 };
-    const ticket = `M${t.x0 + t.r} ${t.y0}H${t.nx - 10}A10 10 0 0 0 ${t.nx + 10} ${t.y0}H${t.x1 - t.r}Q${t.x1} ${t.y0} ${t.x1} ${t.y0 + t.r}`
+    const c = { milk: '#ffffff', rose: '#e23e86', sky: '#cfe6ff', corn: '#5b9bff', ink: '#3a2a4d', soft: '#7b6a8e', past: '#f3eef5', line: '#e6dcea' };
+    const box = (x, y, w, h, r) => `M${x + r} ${y}H${x + w - r}Q${x + w} ${y} ${x + w} ${y + r}V${y + h - r}Q${x + w} ${y + h} ${x + w - r} ${y + h}`
+      + `H${x + r}Q${x} ${y + h} ${x} ${y + h - r}V${y + r}Q${x} ${y} ${x + r} ${y}Z`;
+    // Everything interactive on the site sits on a hard 8-bit shadow.
+    const card = (d) => `<path d="${d}" transform="translate(5 5)" fill="${c.ink}"/><path d="${d}" fill="${c.milk}" stroke="${c.ink}" stroke-width="2"/>`;
+
+    // The calendar: a month starting on a Wednesday, past days greyed, one date picked.
+    const cal = { x: 36, y: 24, w: 300, h: 178 };
+    let s = card(box(cal.x, cal.y, cal.w, cal.h, 12))
+      + `<path d="M${cal.x} ${cal.y + 34}H${cal.x + cal.w}" stroke="${c.ink}" stroke-width="2"/>`
+      + `<rect x="${cal.x + 16}" y="${cal.y + 12}" width="96" height="10" rx="5" fill="${c.ink}"/>`
+      + `<path d="M${cal.x + cal.w - 44} ${cal.y + 17}l7-6v12zM${cal.x + cal.w - 18} ${cal.y + 17}l-7-6v12z" fill="${c.ink}"/>`;
+    const cw = 34, ch = 20, gap = 6;
+    for (let r = 0; r < 5; r++) for (let d = 0; d < 7; d++) {
+      const day = r * 7 + d - 2;
+      if (day < 0 || day > 29) continue;
+      const picked = day === 17, past = day < 9;
+      s += `<rect x="${cal.x + 13 + d * (cw + gap)}" y="${cal.y + 46 + r * (ch + 5)}" width="${cw}" height="${ch}" rx="5" `
+        + `fill="${picked ? c.corn : past ? c.past : c.milk}" stroke="${picked ? c.ink : c.line}" stroke-width="${picked ? 2 : 1}"/>`;
+    }
+
+    // The clock: its hands sweep the shortest way to the chosen time (here, half past four).
+    const k = { x: 472, y: 114, r: 78 };
+    s += `<circle cx="${k.x + 5}" cy="${k.y + 5}" r="${k.r}" fill="${c.ink}"/><circle cx="${k.x}" cy="${k.y}" r="${k.r}" fill="${c.milk}" stroke="${c.ink}" stroke-width="2"/>`;
+    for (let i = 0; i < 12; i++) {
+      const a = (i * Math.PI) / 6, major = i % 3 === 0, r0 = k.r - (major ? 16 : 9), r1_ = k.r - 6;
+      s += `<path d="M${r1(k.x + r0 * Math.sin(a))} ${r1(k.y - r0 * Math.cos(a))}L${r1(k.x + r1_ * Math.sin(a))} ${r1(k.y - r1_ * Math.cos(a))}" stroke="${c.ink}" stroke-width="${major ? 3 : 1.5}" stroke-linecap="round"/>`;
+    }
+    const hand = (turn, len, width, color) => `<path d="M${k.x} ${k.y}L${r1(k.x + len * Math.sin(turn * 2 * Math.PI))} ${r1(k.y - len * Math.cos(turn * 2 * Math.PI))}" stroke="${color}" stroke-width="${width}" stroke-linecap="round"/>`;
+    s += hand(4.5 / 12, 40, 5, c.ink) + hand(0.5, 60, 3, c.corn) + `<circle cx="${k.x}" cy="${k.y}" r="5.5" fill="${c.rose}"/>`;
+
+    // The pass: rows of details, the photo that confirms the booking, a stub with a barcode.
+    const t = { x0: 604, y0: 32, x1: 1104, y1: 196, r: 12, nx: 944 };
+    const pass = `M${t.x0 + t.r} ${t.y0}H${t.nx - 10}A10 10 0 0 0 ${t.nx + 10} ${t.y0}H${t.x1 - t.r}Q${t.x1} ${t.y0} ${t.x1} ${t.y0 + t.r}`
       + `V${t.y1 - t.r}Q${t.x1} ${t.y1} ${t.x1 - t.r} ${t.y1}H${t.nx + 10}A10 10 0 0 0 ${t.nx - 10} ${t.y1}H${t.x0 + t.r}`
       + `Q${t.x0} ${t.y1} ${t.x0} ${t.y1 - t.r}V${t.y0 + t.r}Q${t.x0} ${t.y0} ${t.x0 + t.r} ${t.y0}Z`;
-    s += `<path d="${ticket}" transform="translate(5 5)" fill="${c.ink}"/><path d="${ticket}" fill="${c.milk}" stroke="${c.ink}" stroke-width="2"/>`
-      + `<path d="M${t.nx} ${t.y0 + 14}V${t.y1 - 14}" stroke="${c.ink}" stroke-width="1.6" stroke-dasharray="3 5"/>`
-      + cells.map(([x, y, col]) => `<rect x="${62 + x * 4}" y="${58 + y * 4}" width="4" height="4" fill="${col === c.milk ? c.blush : col}"/>`).join('')
-      + `<rect x="62" y="112" width="150" height="10" rx="5" fill="${c.blush}"/><rect x="62" y="132" width="112" height="10" rx="5" fill="${c.blush}"/>`
-      + `<rect x="62" y="152" width="170" height="10" rx="5" fill="${c.sky}"/>`
-      + `<g transform="rotate(-6 296 112)"><rect x="250" y="58" width="92" height="106" fill="${c.milk}" stroke="${c.ink}" stroke-width="1.6"/>`
-      + `<rect x="258" y="66" width="76" height="70" fill="${c.sky}"/><circle cx="296" cy="92" r="11" fill="${c.milk}"/>`
-      + `<path d="M274 136c0-16 10-24 22-24s22 8 22 24" fill="${c.milk}"/></g>`
-      + `<rect x="252" y="128" width="58" height="22" rx="4" fill="none" stroke="${c.rose}" stroke-width="2" transform="rotate(-14 281 139)"/>`;
-    let bars = '', bx = 392;
-    while (bx < 452) { const w = [1.5, 2.5, 4][Math.floor(rand() * 3)]; bars += `M${r1(bx)} 64h${w}v${t.y1 - t.y0 - 52}h-${w}z`; bx += w + 2 + rand() * 2.5; }
-    s += `<path d="${bars}" fill="${c.ink}"/>`;
-    // Sparkles.
-    const star = (x, y, r, col) => `<path d="M${x} ${y - r}Q${x} ${y} ${x + r} ${y}Q${x} ${y} ${x} ${y + r}Q${x} ${y} ${x - r} ${y}Q${x} ${y} ${x} ${y - r}Z" fill="${col}"/>`;
-    s += star(560, 52, 9, c.corn) + star(1070, 196, 8, c.bubble) + star(812, 190, 6, c.blush) + star(1086, 36, 7, c.corn) + star(640, 186, 5, c.bubble);
-    return s;
+    s += card(pass) + `<path d="M${t.nx} ${t.y0 + 14}V${t.y1 - 14}" stroke="${c.ink}" stroke-width="1.6" stroke-dasharray="3 5"/>`;
+    [[150, c.ink], [118, c.corn], [170, c.ink]].forEach(([w, col], i) => {
+      const y = t.y0 + 26 + i * 44;
+      s += `<rect x="${t.x0 + 24}" y="${y}" width="54" height="7" rx="3.5" fill="${c.soft}" opacity=".45"/>`
+        + `<rect x="${t.x0 + 24}" y="${y + 14}" width="${w}" height="11" rx="5.5" fill="${col}"/>`;
+    });
+    s += `<g transform="rotate(-4 ${t.x0 + 274} ${t.y0 + 80})"><rect x="${t.x0 + 230}" y="${t.y0 + 22}" width="88" height="104" fill="${c.milk}" stroke="${c.ink}" stroke-width="1.6"/>`
+      + `<rect x="${t.x0 + 238}" y="${t.y0 + 30}" width="72" height="68" fill="${c.sky}"/><circle cx="${t.x0 + 274}" cy="${t.y0 + 56}" r="11" fill="${c.milk}"/>`
+      + `<path d="M${t.x0 + 252} ${t.y0 + 98}c0-16 10-24 22-24s22 8 22 24" fill="${c.milk}"/></g>`
+      + `<rect x="${t.x0 + 232}" y="${t.y0 + 104}" width="62" height="22" rx="4" fill="none" stroke="${c.rose}" stroke-width="2" transform="rotate(-12 ${t.x0 + 263} ${t.y0 + 115})"/>`;
+    const rand = rng(5);
+    let bars = '', bx = t.nx + 24;
+    while (bx < t.x1 - 26) { const w = [1.5, 2.5, 4][Math.floor(rand() * 3)]; bars += `M${r1(bx)} ${t.y0 + 30}h${w}v${t.y1 - t.y0 - 60}h-${w}z`; bx += w + 2 + rand() * 2.5; }
+    return s + `<path d="${bars}" fill="${c.ink}"/>`;
   },
 };
 
@@ -696,7 +717,7 @@ function endMark() {
 
 // ─── Build, check, preview, save ─────────────────────────────────────────────
 
-const PROOFS = { 'proof-campus-guard': CAMPUS, 'proof-vishvakrit': VISHVAKRIT, 'proof-ledger-one': LEDGER, 'proof-daari': DAARI, 'proof-rebeka': REBEKA, 'proof-gift': GIFT };
+const PROOFS = { 'proof-campus-guard': CAMPUS, 'proof-vishvakrit': VISHVAKRIT, 'proof-ledger-one': LEDGER, 'proof-daari': DAARI, 'proof-rebeka': REBEKA, 'proof-booking': BOOKING };
 
 function build() {
   const files = { 'hero-light': hero('light'), 'hero-dark': hero('dark'), 'matter-light': matter('light'), 'matter-dark': matter('dark') };
@@ -712,6 +733,11 @@ function check(files) {
   for (const [paise, want] of cases) if (inr(paise) !== want) problems.push(`inr(${paise}) = ${inr(paise)}, want ${want}`);
   if (short('M1.25 -0.04L2e-7 3.96') !== 'M1.3 0L0 4') problems.push(`short() = ${short('M1.25 -0.04L2e-7 3.96')}`);
   if (tint('#000000', 0.3) !== '#b3b3b3') problems.push(`tint = ${tint('#000000', 0.3)}`);
+  // The name is printed only by the three plates, so their overprint must read as black on paper
+  // and white on screen: dark or light enough, and no channel off by more than a small tint.
+  const [lr, lg, lb] = composite('light'), [dr, dg, db] = composite('dark');
+  if (Math.max(lr, lg, lb) > 24 || Math.max(lr, lg, lb) - Math.min(lr, lg, lb) > 8) problems.push(`light composite ${[lr, lg, lb]} is not a near-neutral black`);
+  if (Math.min(dr, dg, db) < 228 || Math.max(dr, dg, db) - Math.min(dr, dg, db) > 8) problems.push(`dark composite ${[dr, dg, db]} is not a near-neutral white`);
   // The rebuilt TrueType must draw exactly what the WOFF2 draws at the default instance,
   // for a simple glyph, a composite (é) and the apostrophe.
   for (const ch of 'dké’2') {
