@@ -80,10 +80,10 @@ In print, a proof is the test sheet you check before the run. These are mine fro
 **A career-path engine for Andhra Pradesh that shows its working.** *Daari* is Telugu for "the path". Name a job and it plans what to learn, in order, then shows exactly what changes when you learn a skill or the market moves. Built at a hackathon with team ASURA; I wrote the engine.
 
 - The language model never decides: every number comes from deterministic code, with its parts.
-- The roadmap is a demand-weighted topological order. On the live demo, learning SQL cuts a 310-hour path by 40 hours.
+- The roadmap is a demand-weighted topological order. In the deployed build, learning SQL cuts a 310-hour path by 40 hours.
 - A Rasch-model adaptive skill test, and a Scam Shield that quotes the exact words behind each flag.
 
-**Live:** [daari-web.vercel.app](https://daari-web.vercel.app), with the engine in [its pull request](https://github.com/dmrk22/asura/pull/1). **Not yet:** 24 skills and 2 roles so far.
+**Code:** the engine is in [its pull request](https://github.com/dmrk22/asura/pull/1). **Not yet:** 24 skills and 2 roles so far.
 
 <sub>Python, FastAPI, NumPy, NetworkX, Hypothesis, Next.js, next-intl. English, Telugu and Hindi. Built in two days.</sub>
 
