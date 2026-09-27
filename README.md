@@ -87,17 +87,17 @@ In print, a proof is the test sheet you check before the run. These are mine fro
 
 <sub>Python, FastAPI, NumPy, NetworkX, Hypothesis, Next.js, next-intl. English, Telugu and Hindi. Built in two days.</sub>
 
-### rebeka
+### rebeka (in active development)
 
 <img src="assets/proof-rebeka.svg" width="100%" alt="On warm paper under a ruler, a one-stroke R mark; small orange envelopes flow into a stack of sheets whose top sheet carries a new entry and three status dots.">
 
-**A personal operating system, built foundation first.** It will turn what my phone already sees (bank messages, payments, location, health) into numbers I can act on, like classes I can still miss or what's safe to spend. No AI at runtime, and every number traceable to its rule and records.
+**A personal operating system I'm building right now, foundation first.** It will turn what my phone already sees (bank messages, payments, location, health) into numbers I can act on, like classes I can still miss or what's safe to spend. No AI at runtime, and every number traceable to its rule and records.
 
 - Append-only Postgres with provenance on every row; the database refuses edits.
 - An idempotent ingest API: rate limits before any database work, hashed per-device tokens and a 14-type event contract.
 - Branded types make mixing paise with minutes a compile error, and CI gates the design on contrast, golden-ratio layout, frame time and Lighthouse.
 
-**Proven:** 788 tests; a red-team audit fixed 16 of 16 findings, each with a test that failed first. **Next:** the money, attendance and forecast engines.
+**Proven:** 788 tests; a red-team audit fixed 16 of 16 findings, each with a test that failed first. **In progress:** the money, attendance and forecast engines, being built now.
 
 <sub>TypeScript, Hono, Drizzle, PostgreSQL, React 19, Vite, Docker. Private repo.</sub>
 
